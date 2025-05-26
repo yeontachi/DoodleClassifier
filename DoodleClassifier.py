@@ -84,3 +84,32 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 y_train = to_categorical(y_train, len(CLASSES))
 y_test = to_categorical(y_test, len(CLASSES))
+
+# ───────────────────────────────────────────────
+# 4. 모델 정의
+# ───────────────────────────────────────────────
+def create_basic_cnn(num_classes):
+    model = Sequential([
+        Conv2D(32, (3,3), activation='relu', input_shape=(28,28,1)),
+        BatchNormalization(),
+        MaxPooling2D(2,2),
+
+        Conv2D(64, (3,3), activation='relu'),
+        BatchNormalization(),
+        MaxPooling2D(2,2),
+
+        Conv2D(128, (3,3), activation='relu'),
+        BatchNormalization(),
+        MaxPooling2D(2,2),
+
+        Flatten(),
+        Dense(256, activation='relu'),
+        Dropout(0.5),
+        Dense(128, activation='relu'),
+        Dropout(0.3),
+        Dense(num_classes, activation='softmax')
+    ])
+
+    model.compile(optimizer=tf.keras.optimizers.Adam(0.0001),
+                  loss='categorical_crossentropy', metrics=['accuracy'])
+    return model
