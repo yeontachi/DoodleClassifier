@@ -133,3 +133,34 @@ def create_mobilenet_model(num_classes):
 
 basic_model = create_basic_cnn(len(CLASSES))
 mobilenet_model = create_mobilenet_model(len(CLASSES))
+
+# ───────────────────────────────────────────────
+# 5. 학습 설정
+# ───────────────────────────────────────────────
+class_weights = compute_class_weight('balanced', classes=np.unique(np.argmax(y_train, axis=1)), y=np.argmax(y_train, axis=1))
+class_weight_dict = dict(enumerate(class_weights))
+
+callbacks = [
+    EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True),
+    ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=2, min_lr=1e-7)
+]
+
+datagen = ImageDataGenerator(
+    rotation_range=15,
+    zoom_range=0.15,
+    width_shift_range=0.15,
+    height_shift_range=0.15,
+    validation_split=0.2
+)
+
+train_gen = datagen.flow(X_train, y_train, batch_size=128, subset='training')
+val_gen = datagen.flow(X_train, y_train, batch_size=128, subset='validation')
+
+# ───────────────────────────────────────────────
+# 6. 모델 학습
+# ───────────────────────────────────────────────
+print("Training Basic CNN...")
+basic_model.fit(train_gen, epochs=5, validation_data=val_gen, callbacks=callbacks, class_weight=class_weight_dict)
+
+print("Training MobileNetV2...")
+mobilenet_model.fit(train_gen, epochs=5, validation_data=val_gen, callbacks=callbacks, class_weight=class_weight_dict)
