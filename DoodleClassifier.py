@@ -113,3 +113,23 @@ def create_basic_cnn(num_classes):
     model.compile(optimizer=tf.keras.optimizers.Adam(0.0001),
                   loss='categorical_crossentropy', metrics=['accuracy'])
     return model
+
+def create_mobilenet_model(num_classes):
+    input_layer = Input(shape=(28, 28, 1))
+    x = Concatenate()([input_layer, input_layer, input_layer])  # (28,28,3)
+    x = UpSampling2D(size=(8,8))(x)  # (224,224,3)
+
+    base_model = MobileNetV2(include_top=False, weights='imagenet', input_tensor=x)
+    base_model.trainable = False
+
+    x = GlobalAveragePooling2D()(base_model.output)
+    x = Dense(256, activation='relu')(x)
+    x = Dropout(0.5)(x)
+    output_layer = Dense(num_classes, activation='softmax')(x)
+
+    model = Model(inputs=input_layer, outputs=output_layer)
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    return model
+
+basic_model = create_basic_cnn(len(CLASSES))
+mobilenet_model = create_mobilenet_model(len(CLASSES))
