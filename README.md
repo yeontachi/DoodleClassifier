@@ -7,3 +7,4 @@ A deep learning-based doodle classifier that recognizes hand-drawn sketches into
 🧠 Includes basic CNN and transfer learning models (MobileNetV2).
 🧪 Visual evaluation with your own hand-drawn PNG images.
 
+Using DataSet : https://github.com/googlecreativelab/quickdraw-dataset
