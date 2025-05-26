@@ -164,3 +164,21 @@ basic_model.fit(train_gen, epochs=5, validation_data=val_gen, callbacks=callback
 
 print("Training MobileNetV2...")
 mobilenet_model.fit(train_gen, epochs=5, validation_data=val_gen, callbacks=callbacks, class_weight=class_weight_dict)
+
+# ───────────────────────────────────────────────
+# 7. 모델 평가 및 저장
+# ───────────────────────────────────────────────
+def evaluate_model(model, X_test, y_test, model_name):
+    predictions = model.predict(X_test)
+    y_pred = np.argmax(predictions, axis=1)
+    y_true = np.argmax(y_test, axis=1)
+
+    print(f"{model_name} Accuracy: {np.mean(y_pred == y_true):.4f}")
+    top3 = tf.keras.metrics.top_k_categorical_accuracy(y_test, predictions, k=3)
+    print(f"{model_name} Top-3 Accuracy: {np.mean(top3):.4f}")
+
+    return predictions, y_pred, y_true
+
+basic_pred, basic_y_pred, y_true = evaluate_model(basic_model, X_test, y_test, "Basic CNN")
+mobilenet_pred, mobilenet_y_pred, _ = evaluate_model(mobilenet_model, X_test, y_test, "MobileNetV2")
+
