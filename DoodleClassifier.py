@@ -220,3 +220,10 @@ def test_user_images():
             print(f"  - Similar classes: {', '.join(recommend[:3])}")
 
 test_user_images()
+
+# ───────────────────────────────────────────────
+# 9. 모델 저장
+# ───────────────────────────────────────────────
+basic_model.save(os.path.join(PROJECT_DIR, 'basic_cnn_model.h5'))
+mobilenet_model.save(os.path.join(PROJECT_DIR, 'mobilenet_model.h5'))
+print("\n✅ Models saved to disk.")
