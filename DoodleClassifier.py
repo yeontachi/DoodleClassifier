@@ -182,3 +182,41 @@ def evaluate_model(model, X_test, y_test, model_name):
 basic_pred, basic_y_pred, y_true = evaluate_model(basic_model, X_test, y_test, "Basic CNN")
 mobilenet_pred, mobilenet_y_pred, _ = evaluate_model(mobilenet_model, X_test, y_test, "MobileNetV2")
 
+# ───────────────────────────────────────────────
+# 8. 테스트 이미지 추론 (로컬 폴더 기반)
+# ───────────────────────────────────────────────
+def get_similar_classes(predicted_class):
+    categories = {
+        'animals': ['cat', 'dog', 'whale', 'fish'],
+        'vehicles': ['airplane', 'car', 'bicycle', 'bus'],
+        'objects': ['book', 'camera', 'key', 'laptop', 'shoe', 'chair'],
+        'food': ['cake', 'hamburger', 'ice cream'],
+        'nature': ['flower', 'tree', 'cloud', 'moon', 'star'],
+        'buildings': ['house', 'door']
+    }
+    for cat, items in categories.items():
+        if predicted_class in items:
+            return [i for i in items if i != predicted_class]
+    return []
+
+def test_user_images():
+    print(f"\nTesting images in: {TEST_IMAGE_DIR}")
+    for file in os.listdir(TEST_IMAGE_DIR):
+        if file.lower().endswith(('.png', '.jpg', '.jpeg')):
+            path = os.path.join(TEST_IMAGE_DIR, file)
+            img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+            img = cv2.resize(img, (28, 28))
+            img = img.astype('float32') / 255.0
+            img = img.reshape(1, 28, 28, 1)
+
+            pred_basic = basic_model.predict(img, verbose=0)
+            pred_mobile = mobilenet_model.predict(img, verbose=0)
+
+            print(f"\nFile: {file}")
+            print(f"  - Basic CNN: {CLASSES[np.argmax(pred_basic)]} ({np.max(pred_basic):.2f})")
+            print(f"  - MobileNetV2: {CLASSES[np.argmax(pred_mobile)]} ({np.max(pred_mobile):.2f})")
+
+            recommend = get_similar_classes(CLASSES[np.argmax(pred_mobile)])
+            print(f"  - Similar classes: {', '.join(recommend[:3])}")
+
+test_user_images()
