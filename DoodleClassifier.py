@@ -84,3 +84,27 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 y_train = to_categorical(y_train, len(CLASSES))
 y_test = to_categorical(y_test, len(CLASSES))
+
+# ───────────────────────────────────────────────
+# 4. 모델 정의
+# ───────────────────────────────────────────────
+
+def create_mobilenet_model(num_classes):
+    input_layer = Input(shape=(28, 28, 1))
+    x = Concatenate()([input_layer, input_layer, input_layer])  # (28,28,3)
+    x = UpSampling2D(size=(8,8))(x)  # (224,224,3)
+
+    base_model = MobileNetV2(include_top=False, weights='imagenet', input_tensor=x)
+    base_model.trainable = False
+
+    x = GlobalAveragePooling2D()(base_model.output)
+    x = Dense(256, activation='relu')(x)
+    x = Dropout(0.5)(x)
+    output_layer = Dense(num_classes, activation='softmax')(x)
+
+    model = Model(inputs=input_layer, outputs=output_layer)
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    return model
+
+basic_model = create_basic_cnn(len(CLASSES))
+mobilenet_model = create_mobilenet_model(len(CLASSES))
