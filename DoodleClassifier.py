@@ -65,3 +65,17 @@ def load_and_preprocess_data(classes, samples_per_class=2000):
     y = y[indices]
 
     return X, y
+
+X, y = load_and_preprocess_data(CLASSES)
+print(f"Data shape: {X.shape}")
+print(f"Label shape: {y.shape}")
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+y_train = to_categorical(y_train, len(CLASSES))
+y_test = to_categorical(y_test, len(CLASSES))
+
+print(f"Train data: {X_train.shape}")
+print(f"Test data: {X_test.shape}")
