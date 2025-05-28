@@ -199,7 +199,7 @@ def get_similar_classes(predicted_class):
             return [i for i in items if i != predicted_class]
     return []
 
-def test_user_images():
+#def test_user_images():
     print(f"\nTesting images in: {TEST_IMAGE_DIR}")
     for file in os.listdir(TEST_IMAGE_DIR):
         if file.lower().endswith(('.png', '.jpg', '.jpeg')):
@@ -219,7 +219,7 @@ def test_user_images():
             recommend = get_similar_classes(CLASSES[np.argmax(pred_mobile)])
             print(f"  - Similar classes: {', '.join(recommend[:3])}")
 
-test_user_images()
+#test_user_images()
 
 # ───────────────────────────────────────────────
 # 9. 모델 저장

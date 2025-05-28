@@ -1,0 +1,12 @@
+# 가상환경
+myenv/
+
+# 대용량 데이터
+quickdraw_data/
+*.npy
+
+
+# 기타 무시할만한 파일
+__pycache__/
+*.pyc
+.DS_Store
