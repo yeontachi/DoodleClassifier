@@ -14,7 +14,7 @@ CLASSES = [
 ]
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-TEST_IMAGE_DIR = os.path.join(PROJECT_DIR, 'test_images')
+TEST_IMAGE_DIR = os.path.join(PROJECT_DIR, 'test_images(94x94)')
 
 # ───────────────────────────────────────────────
 # 2. 모델 로딩 (이미 학습된 모델이 저장되어 있어야 함)

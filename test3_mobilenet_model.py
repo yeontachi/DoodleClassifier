@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
+import tensorflow as tf
 from tensorflow.keras.models import load_model
 
 # ───────────────────────────────────────────────
@@ -17,20 +17,17 @@ PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_IMAGE_DIR = os.path.join(PROJECT_DIR, 'test_images(94x94)')
 
 # ───────────────────────────────────────────────
-# 2. 모델 로딩 (이미 학습된 모델이 저장되어 있어야 함)
+# 2. 모델 로딩
 # ───────────────────────────────────────────────
-basic_model = load_model(os.path.join(PROJECT_DIR, 'basic_cnn_model_96.h5'))
 mobilenet_model = load_model(os.path.join(PROJECT_DIR, 'mobilenet_model_96.h5'))
 
 # ───────────────────────────────────────────────
-# 3. 테스트 및 시각화 함수 정의
+# 3. 테스트 및 결과 저장 함수 정의
 # ───────────────────────────────────────────────
-def test_and_visualize_images(model, model_name, image_dir=TEST_IMAGE_DIR):
+def test_mobilenet_and_save(model, image_dir=TEST_IMAGE_DIR, output_file="mobilenet_test_results.txt"):
     correct = 0
     total = 0
-
-    plt.figure(figsize=(15, 30))
-    idx = 1
+    results = []
 
     for file in sorted(os.listdir(image_dir)):
         if file.lower().endswith(('.png', '.jpg', '.jpeg')):
@@ -43,37 +40,39 @@ def test_and_visualize_images(model, model_name, image_dir=TEST_IMAGE_DIR):
             img_input = img_resized.astype('float32') / 255.0
             img_input = img_input.reshape(1, 96, 96, 1)
 
+            # MobileNetV2 입력 형식에 맞게 변환
+            img_expanded = np.concatenate([img_input] * 3, axis=-1)       # (28,28,3)
+            img_upscaled = tf.image.resize(img_expanded, [224, 224])     # (224,224,3)
+
             # 예측
-            pred = model.predict(img_input, verbose=0)
+            pred = model.predict(img_upscaled, verbose=0)
             pred_class = CLASSES[np.argmax(pred)]
-            pred_prob = np.max(pred)
+            pred_prob = float(np.max(pred))
 
-            # 정답 비교
             is_correct = pred_class == true_class
-            total += 1
             correct += int(is_correct)
+            total += 1
 
-            # 시각화
-            plt.subplot(10, 3, idx)
-            plt.imshow(img, cmap='gray')
-            plt.axis('off')
-            title_color = 'green' if is_correct else 'red'
-            plt.title(f"{file}\n→ {pred_class} ({pred_prob:.2f})", color=title_color, fontsize=10)
-            idx += 1
+            # 결과 저장
+            result = (
+                f"파일: {file}\n"
+                f"  → 예측: {pred_class}\n"
+                f"  → 일치 여부: {'✅' if is_correct else '❌'}\n"
+                f"  → 확률: {pred_prob:.4f}\n"
+            )
+            results.append(result)
 
-            # 콘솔 출력
-            print(f"[{model_name}] File: {file}")
-            print(f"  → Predicted: {pred_class}")
-            print(f"  → Match: {'✅' if is_correct else '❌'}")
-            print(f"  → Probability: {pred_prob:.4f}\n")
+    # 정확도 추가
+    accuracy = correct / total
+    results.append(f"\n[정확도] MobileNetV2: {accuracy:.2%}\n")
 
-    acc = correct / total
-    print(f"\n✅ [{model_name}] Accuracy on test images: {acc:.2%}")
-    plt.tight_layout()
-    plt.show()
+    # 결과 텍스트 파일 저장
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.writelines("\n".join(results))
+
+    print(f"✅ 테스트 결과가 '{output_file}'에 저장되었습니다.")
 
 # ───────────────────────────────────────────────
-# 4. 두 모델로 테스트 수행
+# 4. 테스트 실행
 # ───────────────────────────────────────────────
-test_and_visualize_images(basic_model, "Basic CNN")
-test_and_visualize_images(mobilenet_model, "MobileNetV2")
+test_mobilenet_and_save(mobilenet_model)
