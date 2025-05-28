@@ -15,13 +15,13 @@ from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import (Conv2D, MaxPooling2D, Flatten, Dense, Dropout,
                                      GlobalAveragePooling2D, BatchNormalization, Input,
-                                     Concatenate, UpSampling2D)
+                                     Concatenate)
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 
 # ───────────────────────────────────────────────
-# 1. 클래스 및 데이터 경로 설정
+# 1. 클래스 및 경로 설정
 # ───────────────────────────────────────────────
 CLASSES = [
     'whale', 'car', 'tree', 'cat', 'airplane', 'hat', 'dog', 'fish', 'bicycle', 'house',
@@ -32,7 +32,6 @@ CLASSES = [
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(PROJECT_DIR, 'quickdraw_data')
 TEST_IMAGE_DIR = os.path.join(PROJECT_DIR, 'test_images')
-
 os.makedirs(DATA_PATH, exist_ok=True)
 
 # ───────────────────────────────────────────────
@@ -43,7 +42,6 @@ def download_quickdraw_data(classes):
         filename = cls.replace(' ', '%20')
         url = f"https://storage.googleapis.com/quickdraw_dataset/full/numpy_bitmap/{filename}.npy"
         output_path = os.path.join(DATA_PATH, f"{cls}.npy")
-
         if not os.path.exists(output_path):
             try:
                 urllib.request.urlretrieve(url, output_path)
@@ -57,7 +55,6 @@ download_quickdraw_data(CLASSES)
 # ───────────────────────────────────────────────
 def load_and_preprocess_data(classes, samples_per_class=2000):
     X, y = [], []
-
     for i, cls in enumerate(tqdm(classes, desc="Loading data")):
         try:
             data = np.load(os.path.join(DATA_PATH, f"{cls}.npy"))
@@ -70,6 +67,7 @@ def load_and_preprocess_data(classes, samples_per_class=2000):
 
     X = np.array(X).astype('float32') / 255.0
     X = X.reshape(-1, 28, 28, 1)
+    X = tf.image.resize(X, [96, 96]).numpy()
     y = np.array(y)
 
     indices = np.arange(len(X))
@@ -77,11 +75,7 @@ def load_and_preprocess_data(classes, samples_per_class=2000):
     return X[indices], y[indices]
 
 X, y = load_and_preprocess_data(CLASSES)
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, stratify=y, random_state=42
-)
-
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
 y_train = to_categorical(y_train, len(CLASSES))
 y_test = to_categorical(y_test, len(CLASSES))
 
@@ -90,7 +84,7 @@ y_test = to_categorical(y_test, len(CLASSES))
 # ───────────────────────────────────────────────
 def create_basic_cnn(num_classes):
     model = Sequential([
-        Conv2D(32, (3,3), activation='relu', input_shape=(28,28,1)),
+        Conv2D(32, (3,3), activation='relu', input_shape=(96,96,1)),
         BatchNormalization(),
         MaxPooling2D(2,2),
 
@@ -102,25 +96,27 @@ def create_basic_cnn(num_classes):
         BatchNormalization(),
         MaxPooling2D(2,2),
 
+        Conv2D(256, (3,3), activation='relu'),
+        BatchNormalization(),
+        MaxPooling2D(2,2),
+
         Flatten(),
-        Dense(256, activation='relu'),
+        Dense(512, activation='relu'),
         Dropout(0.5),
-        Dense(128, activation='relu'),
+        Dense(256, activation='relu'),
         Dropout(0.3),
         Dense(num_classes, activation='softmax')
     ])
-
-    model.compile(optimizer=tf.keras.optimizers.Adam(0.0001),
+    model.compile(optimizer=tf.keras.optimizers.Adam(1e-4),
                   loss='categorical_crossentropy', metrics=['accuracy'])
     return model
 
 def create_mobilenet_model(num_classes):
-    input_layer = Input(shape=(28, 28, 1))
-    x = Concatenate()([input_layer, input_layer, input_layer])  # (28,28,3)
-    x = UpSampling2D(size=(8,8))(x)  # (224,224,3)
+    input_layer = Input(shape=(96, 96, 1))
+    x = Concatenate()([input_layer, input_layer, input_layer])  # (96,96,3)
 
     base_model = MobileNetV2(include_top=False, weights='imagenet', input_tensor=x)
-    base_model.trainable = False
+    base_model.trainable = False  # 필요 시 True로 fine-tuning 가능
 
     x = GlobalAveragePooling2D()(base_model.output)
     x = Dense(256, activation='relu')(x)
@@ -141,15 +137,18 @@ class_weights = compute_class_weight('balanced', classes=np.unique(np.argmax(y_t
 class_weight_dict = dict(enumerate(class_weights))
 
 callbacks = [
-    EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True),
-    ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=2, min_lr=1e-7)
+    EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True),
+    ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-7)
 ]
 
 datagen = ImageDataGenerator(
     rotation_range=15,
-    zoom_range=0.15,
-    width_shift_range=0.15,
-    height_shift_range=0.15,
+    zoom_range=0.2,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.1,
+    horizontal_flip=True,
+    fill_mode='nearest',
     validation_split=0.2
 )
 
@@ -160,70 +159,26 @@ val_gen = datagen.flow(X_train, y_train, batch_size=128, subset='validation')
 # 6. 모델 학습
 # ───────────────────────────────────────────────
 print("Training Basic CNN...")
-basic_model.fit(train_gen, epochs=5, validation_data=val_gen, callbacks=callbacks, class_weight=class_weight_dict)
+basic_model.fit(train_gen, epochs=30, validation_data=val_gen, callbacks=callbacks, class_weight=class_weight_dict)
 
 print("Training MobileNetV2...")
-mobilenet_model.fit(train_gen, epochs=5, validation_data=val_gen, callbacks=callbacks, class_weight=class_weight_dict)
+mobilenet_model.fit(train_gen, epochs=30, validation_data=val_gen, callbacks=callbacks, class_weight=class_weight_dict)
 
 # ───────────────────────────────────────────────
-# 7. 모델 평가 및 저장
+# 7. 평가 및 저장
 # ───────────────────────────────────────────────
 def evaluate_model(model, X_test, y_test, model_name):
     predictions = model.predict(X_test)
     y_pred = np.argmax(predictions, axis=1)
     y_true = np.argmax(y_test, axis=1)
-
     print(f"{model_name} Accuracy: {np.mean(y_pred == y_true):.4f}")
     top3 = tf.keras.metrics.top_k_categorical_accuracy(y_test, predictions, k=3)
     print(f"{model_name} Top-3 Accuracy: {np.mean(top3):.4f}")
-
     return predictions, y_pred, y_true
 
 basic_pred, basic_y_pred, y_true = evaluate_model(basic_model, X_test, y_test, "Basic CNN")
 mobilenet_pred, mobilenet_y_pred, _ = evaluate_model(mobilenet_model, X_test, y_test, "MobileNetV2")
 
-# ───────────────────────────────────────────────
-# 8. 테스트 이미지 추론 (로컬 폴더 기반)
-# ───────────────────────────────────────────────
-def get_similar_classes(predicted_class):
-    categories = {
-        'animals': ['cat', 'dog', 'whale', 'fish'],
-        'vehicles': ['airplane', 'car', 'bicycle', 'bus'],
-        'objects': ['book', 'camera', 'key', 'laptop', 'shoe', 'chair'],
-        'food': ['cake', 'hamburger', 'ice cream'],
-        'nature': ['flower', 'tree', 'cloud', 'moon', 'star'],
-        'buildings': ['house', 'door']
-    }
-    for cat, items in categories.items():
-        if predicted_class in items:
-            return [i for i in items if i != predicted_class]
-    return []
-
-#def test_user_images():
-    print(f"\nTesting images in: {TEST_IMAGE_DIR}")
-    for file in os.listdir(TEST_IMAGE_DIR):
-        if file.lower().endswith(('.png', '.jpg', '.jpeg')):
-            path = os.path.join(TEST_IMAGE_DIR, file)
-            img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-            img = cv2.resize(img, (28, 28))
-            img = img.astype('float32') / 255.0
-            img = img.reshape(1, 28, 28, 1)
-
-            pred_basic = basic_model.predict(img, verbose=0)
-            pred_mobile = mobilenet_model.predict(img, verbose=0)
-
-            print(f"\nFile: {file}")
-            print(f"  - Basic CNN: {CLASSES[np.argmax(pred_basic)]} ({np.max(pred_basic):.2f})")
-            print(f"  - MobileNetV2: {CLASSES[np.argmax(pred_mobile)]} ({np.max(pred_mobile):.2f})")
-
-            recommend = get_similar_classes(CLASSES[np.argmax(pred_mobile)])
-            print(f"  - Similar classes: {', '.join(recommend[:3])}")
-
-#test_user_images()
-
-# ───────────────────────────────────────────────
-# 9. 모델 저장
-# ───────────────────────────────────────────────
-basic_model.save(os.path.join(PROJECT_DIR, 'basic_cnn_model.h5'))
-mobilenet_model.save(os.path.join(PROJECT_DIR, 'mobilenet_model.h5'))
+basic_model.save(os.path.join(PROJECT_DIR, 'basic_cnn_model_96.h5'))
+mobilenet_model.save(os.path.join(PROJECT_DIR, 'mobilenet_model_96.h5'))
 print("\n✅ Models saved to disk.")
